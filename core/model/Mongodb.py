@@ -53,8 +53,8 @@ class Mongodb:
     def get_database_list(self):
         """
             # 获取全部数据库名
-            from model import mongodb
-            database_list = mongodb.get_database_list()
+            obj_mongodb = self.db(dbtype='mongodb', active_index=0)
+            database_list = obj_mongodb.get_database_list()
         """
         return self.link_obj.list_database_names()
 
@@ -62,8 +62,8 @@ class Mongodb:
     def get_table_list(self) -> List[str]:
         """
            # 获取全部表(集合)名
-           from model import mongodb
-           collection_list = mongodb.database('fenlei_zimeiti').get_collection_list()
+           obj_mongodb = self.db(dbtype='mongodb', active_index=0)
+           collection_list = obj_mongodb.database('fenlei_zimeiti').get_collection_list()
        """
         return self.database_obj.list_collection_names()
 
@@ -72,8 +72,8 @@ class Mongodb:
     def table_copy_to(self, new_table_name):
         """
         把 company 集合的数据完全复制到 new_company
-        from model import mongodb
-        result = mongodb.database('fenlei_zimeiti').table('company').table_copy_to('new_company')
+        obj_mongodb = self.db(dbtype='mongodb', active_index=0)
+        result = obj_mongodb.database('fenlei_zimeiti').table('company').table_copy_to('new_company')
         """
 
         # 指定数据库表(集合)
@@ -88,17 +88,17 @@ class Mongodb:
               ) -> List:
         """
         查询- 普通查询(where查询条件支持所有mongodb语法)
-        from model import mongodb
-        result = mongodb.table('meiti').query(
+        obj_mongodb = self.db(dbtype='mongodb', active_index=0)
+        result = obj_mongodb.table('meiti').query(
                     where={'id': {'$gt': '9980'}},
                     fieldFilter= {'_id': 0},
                     sort=[('id', 1)]
             )
         # 动态改变数据库查询
-        result2 = mongodb.database('fenlei_zimeiti').table('media_area').query()
-        返回值：
-            非空结果：[{...},[...]]
-            空结果：[]
+        result2 = obj_mongodb.database('fenlei_zimeiti').table('media_area').query()
+        # 返回值：
+        # 非空结果：[{...},[...]]
+        # 空结果：[]
         """
 
         # fieldFilter = {**{'_id': 0}, **fieldFilter}
@@ -125,8 +125,8 @@ class Mongodb:
                        ) -> List:
         """
         查询- 查询某个字段全部值(where查询条件支持所有mongodb语法)
-        from model import mongodb
-        result = mongodb.database('fenlei_zimeiti').table('meiti').query_distinct(
+        obj_mongodb = self.db(dbtype='mongodb', active_index=0)
+        result = obj_mongodb.database('fenlei_zimeiti').table('meiti').query_distinct(
                     where={'id': {'$gt': '9980'}},
                     distinct='id'
             )
@@ -170,9 +170,9 @@ class Mongodb:
                                 {'$match': {'id': {'$gte': 20}}},
                                 {"$count": "totalNum"}
                             ])
-                结果： [{'totalNum': 525}]
+                # 结果： [{'totalNum': 525}]
             
-            返回值：数据不为空返回字典列表，数据为空返回空列表[]
+            # 返回值：数据不为空返回字典列表，数据为空返回空列表[]
             """
 
     def query_aggregate(self,
@@ -189,16 +189,16 @@ class Mongodb:
 
     """
     查询 - 分页查询(where查询条件支持所有mongodb语法)
-    from model import mongodb
-    result = mongodb.table('meiti').query_page(
-                where={'id': {'$gt': '9980'}},
-                currentPage=currentPage,
-                pageSize=pageSize,
-                sort=[('id', 1)]
-        )
-    返回值：
-        非空数据时：{'items': [{...},{...}], 'pages': {'totalCount': 100, 'pageCount': 10, 'pageSize': 100, 'currentPage': 1}}
-        空数据时：{'items': [], 'pages': {'totalCount': 0, 'pageCount': 0, 'pageSize': 100, 'currentPage': 1}}
+    obj_mongodb = self.db(dbtype='mongodb', active_index=0)
+    result = obj_mongodb.table('meiti').query_page(
+            where={'id': {'$gt': '9980'}},
+            currentPage=currentPage,
+            pageSize=pageSize,
+            sort=[('id', 1)]
+    )
+    # 返回值：
+    # 非空数据时：{'items': [{...},{...}], 'pages': {'totalCount': 100, 'pageCount': 10, 'pageSize': 100, 'currentPage': 1}}
+    # 空数据时：{'items': [], 'pages': {'totalCount': 0, 'pageCount': 0, 'pageSize': 100, 'currentPage': 1}}
     """
 
     def query_page(self,
@@ -269,9 +269,19 @@ class Mongodb:
         return return_result
 
     """
+           插入单条数据
+           # 返回值：返回新增_id字符串形式
+           result = obj_mongodb.table('sites').add({'x': i})
+           """
+
+    def add_one(self, data: dict) -> str:
+        result = self.database_obj[self.table_name].insert_one(data)
+        return str(result.inserted_id)
+
+    """
     插入多条数据
     返回值：默认 return_type='count'返回新增行数，可选值return_type='_id' 返回新增_id字符串值形式的列表
-    result = obj_table.table('sites').add([{'x': i} for i in range(2)])
+    result = obj_mongodb.table('sites').add([{'x': i} for i in range(2)])
     """
     def add_many(self, data: List[dict], return_type='count') -> list[str] | int:
         # 指定数据库表(集合)
@@ -283,19 +293,10 @@ class Mongodb:
                 return len(result.inserted_ids)
 
     """
-       插入单条数据
-       返回值：返回新增_id字符串形式
-       result = obj_table.table('sites').add({'x': i})
-       """
-    def add_one(self, data: dict) -> str:
-        result = self.database_obj[self.table_name].insert_one(data)
-        return str(result.inserted_id)
-
-
-    """
-        修改，返回更改条数
-        from model import mongodb
-        result = mongodb.table('sites').update(
+        修改
+        # 返回更改条数
+        obj_mongodb = self.db(dbtype='mongodb', active_index=0)
+        result = obj_mongodb.table('sites').update(
             where={"name": {"$regex": "^G"}},
             update_sql={"$set": {"url": '456'}}
         )
@@ -313,18 +314,19 @@ class Mongodb:
 
     """
        重命名表(集合)
-      from model import mongodb
-      mongodb.rename_table('sites')
+      obj_mongodb = self.db(dbtype='mongodb', active_index=0)
+      obj_mongodb.rename_table('sites')
    """
 
     def rename_table(self, new_table_name: str) -> None:
         self.database_obj[self.table_name].rename(new_table_name)
 
     """
-        删除集合内容，返回删除的条数
-        注：如果不写删除条件会删除全部集合内文档
-        from model import mongodb
-        result = mongodb.table('sites').delete(
+        删除集合内容
+        # 返回删除的条数
+        # 注：如果不写删除条件会删除全部集合内文档
+        obj_mongodb = self.db(dbtype='mongodb', active_index=0)
+        result = obj_mongodb.table('sites').delete(
             where={ "name": {"$regex": "^F"} },
         )
     """
@@ -337,8 +339,8 @@ class Mongodb:
 
     """
        删除集合(表)
-      from model import mongodb
-      result = mongodb.table('sites').drop()
+      obj_mongodb = self.db(dbtype='mongodb', active_index=0)
+      result = obj_mongodb.table('sites').drop()
        """
 
     def drop(self) -> None:
@@ -346,8 +348,8 @@ class Mongodb:
 
     """
           删除数据库
-         from model import mongodb
-         result = mongodb.drop_database('my_test')
+         obj_mongodb = self.db(dbtype='mongodb', active_index=0)
+         result = obj_mongodb.drop_database('my_test')
           """
 
     def drop_database(self, database_name):

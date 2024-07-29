@@ -9,7 +9,7 @@ from config.UploadConfig import UploadConfig
 from core.ComtrollerBase import ComtrollerBase
 from core.common.password import md5
 from core.common.file import get_file_info
-from core.extend.multipart__form_data.InputParse import InputParse
+from core.extend.multipart_form_data.InputParse import InputParse
 import json
 
 
@@ -29,7 +29,6 @@ class Request(ComtrollerBase):
             url = 'http://127.0.0.1:5111/index'
             # 请求头
             header = {
-                'Content-Type': 'multipart/form-data',
                 'phone': '13688888888',
                 'key': '4afadf937d033a286d2127e64f44db63',
             }
@@ -45,7 +44,15 @@ class Request(ComtrollerBase):
                 'pic': b'E:\\project\\python\\test\\tum6.png',  
             }
             result = self.client(url=url, params=params, data=data, header=header, timeout=None)
-            print(result.text)
+            # 输出响应信息
+            print(result.text) # 返回响应内容
+            print(result.response_header) # 以列表元祖对的形式返回响应头信息
+            print(result.version) # 返回版本信息
+            print(result.status) # 返回状态码200 成功，404 代表网页未找到
+            print(result.closed) # 返回对象是否关闭布尔值 False
+            print(result.url) # 返回检索的URL http://127.0.0.1:5111/index?type=newsmedia
+            print(result.code) # 返回响应的HTTP状态码 200
+            print(result.msg) # 访问成功则返回 ok
     """
 
     @final
@@ -53,7 +60,7 @@ class Request(ComtrollerBase):
         # 1.请求头
         default_headers = {
             'Content-Type': 'application/x-www-form-urlencoded',
-            'User-Agent': 'homeClient Runtime +http://www.itinhs.cn/'
+            'User-Agent': 'homepyClient author 1129881228@qq.com'
             # 'User-Agent': 'Mozilla/5.0 (X11; Fedora; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'
         }
         header = {**default_headers, **header}
@@ -128,7 +135,7 @@ class Request(ComtrollerBase):
             # 以列表元祖对的形式返回响应头信息
             # [('server', 'homeServer'), ('Content-Type', 'application/json;charset:utf-8;')
             response_header = response_obj.getheaders()
-            version = response_obj.version  # 返回版本信息 11
+            version = response_obj.version  # 返回版本信息
             status = response_obj.status  # 返回状态码200 成功，404 代表网页未找到
             closed = response_obj.closed  # 返回对象是否关闭布尔值 False
             url = response_obj.geturl()  # 返回检索的URL http://127.0.0.1:5111/index?type=newsmedia

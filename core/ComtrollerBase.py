@@ -1,4 +1,4 @@
-from config.CORS import CORS
+from config.CorsConfig import CorsConfig
 
 
 class ComtrollerBase:
@@ -9,9 +9,9 @@ class ComtrollerBase:
         # 响应头
         self.__header_response = [
             ('Content-Type', 'application/json;charset:utf-8;'),
-            ('Access-Control-Allow-Origin', CORS.origin),
-            ('Access-Control-Allow-Headers', CORS.headers),
-            ('Access-Control-Allow-Methods', CORS.methods),
+            ('Access-Control-Allow-Origin', CorsConfig.allow_host),
+            ('Access-Control-Allow-Headers', '*'),
+            ('Access-Control-Allow-Methods', '*'),
         ]
 
     # 获取 env 属性

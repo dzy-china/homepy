@@ -48,8 +48,7 @@ class Sqlite:
 
     """
        功能：新增，支持批量
-       返回值：新增行数
-       示例：
+       # 返回值：新增行数
         result = sqlite_obj.table("student").add(
             field=['name', 'age'],
             fieldVal=[
@@ -82,8 +81,7 @@ class Sqlite:
 
     """
            功能：删除，支持批量
-          返回值：删除行数
-          示例：
+          # 返回值：删除行数
            result = sqlite_obj.table("student").delete(
                whereSql='where id = %s',
                whereSqlVal=[(25), (26), (27)]
@@ -104,13 +102,14 @@ class Sqlite:
 
     """
         功能：修改，支持批量不同修改
-        返回值：修改受影响行数
         示例1：批量相同修改 
+        # 返回值：修改受影响行数
             result = sqlite_obj.table("student").edit(
                     sql='set gender=? where name=?',
                     sqlVal=[('女','Tom')]
                 )
         示例2：批量不同修改 
+        # 返回值：修改受影响行数
             result = sqlite_obj.table("student").edit(
                 sql='set age=? where name=?',
                 sqlVal=[

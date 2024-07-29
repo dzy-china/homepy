@@ -68,7 +68,7 @@ class GoodsOrder(Base):
 > python数据类型会自动转化为前端能识别的数据类型
 >
 
-## 六、内置拓展
+## 六、控制器内置功能
 
 ### 6.1、cookie
 > 用法示例：
@@ -162,52 +162,650 @@ class Upload(Base):
 
 #### 6.5.1 mysql
 
-##### 6.5.1.1 query 
-
-> 查询
+##### 实例化mysql对象
 
 ```python
- obj_mysql = self.db(dbtype='mysql', active_index=0)
-    result = obj_mysql.table('member').query(
-            whereSql='id=?',
-            whereSqlVal=[20]
-        )
-    # 或
-    obj_mysql = self.db() # 默认使用mysql，0索引配置项
-    result = obj_mysql.table('member').query(
-            whereSql='id=?',
-            whereSqlVal=[20]
+obj_mysql = self.db(dbtype='mysql', active_index=0)
+ # 或
+obj_mysql = self.db() # 默认使用mysql，0索引配置项
+```
+
+##### 新增
+
+> 支持批量
+
+示例
+
+```python
+# 返回值：新增首条id值(新增多条时，返回首条插入时的新增id)
+result = obj_mysql.table("student").add(
+        field=['name', 'age'],
+        fieldVal=[
+            ('july', '14'),
+            ('june', '25'),
+            ('marin', '36')
+        ]
+    )
+```
+
+##### 删除
+
+> 支持批量
+
+示例
+
+```python
+# 返回值：删除行数
+result = mysql.table("student").delete(
+               whereSql='where id = ?',
+               whereSqlVal=[(25), (26), (27)]
+           )
+```
+
+##### 修改
+
+> 支持批量不同修改
+
+示例1： 批量相同修改
+
+```python
+result = mysql.table("student").edit(
+                sql='set gender=? where name=?',
+                sqlVal=[('女','Tom')]
+            )
+```
+
+示例2：批量不同修改
+
+```python
+result = mysql.table("student").edit(
+            sql='set age=? where name=?',
+            sqlVal=[
+                ('10', 'july'),
+                ('11', 'june'),
+                ('12', 'marin'),
+            ]
         )
 ```
 
 
 
-#### 6.5.2 mongodb
+##### 查询
 
-##### 6.5.2.1 query 
-
-> ##### 查询
+> 普通查询
 
 ```python
-obj_mongodb = self.db(dbtype='mongodb', active_index=0)
-    result =  obj_mongodb.database('meijieyi_ziyuan').table('wangzhan_meiti_show').query(
-            where={'id': '66421'},
-        )
-```
-
-#### 6.5.3 sqlite
-
-##### 6.5.3.1 query
-
-> 查询
-
-```python
-obj_sqlite = self.db(dbtype='sqlite', active_index=0)
-result = obj_sqlite.table('student').query(
-        whereSql='id>?',
+result = mysql.table('student').query(
+        whereSql='where id>?',
         whereSqlVal=[12]
     )
 ```
 
+> ##### 分页查询
+>
+
+```python
+result = mysql.table('student').query_page(
+            whereSql='where id>?',
+            whereSqlVal=[12],
+            currentPage=1,
+            pageSize=5
+        )
+```
+
+> 查询某列不同值
+
+```python
+result = mysql.table('student')query_dif(
+        whereSql='where id>?',
+        whereSqlVal=[12],
+        field='id'
+    )
+```
+
+> 多表查询
+
+格式：
+
+`query_uni({"tb1":"a", "tb2" : "b"}, ['tb1_key', 'tb2_key'], "whereSql", [whereSqlVal], false)`
+
+`query_uni({"tb1":"a", "tb2" : "b", "tb3" : "c"},[['tb1_key1', 'tb1_key2'], 'tb2_key','tb3_key'], "whereSql", [whereSqlVal], false)`
+
+示例：
+
+```python
+result = mysql.query_uni(
+            uniTb={"hs_archives": "a", "hs_addonarticle": "b","hs_arctype": "c"},
+            uniKey=[['id','typeid'],'aid', 'id'],
+            whereSql='where a.id>?',
+            whereSqlVal=[12],
+            fieldsAlias=True
+        )
+```
+
+> 多表分页查询
+
+格式：
+
+`query_uni_page({"tb1":"a", "tb2" : "b"}, ['tb1_key', 'tb2_key'], "whereSql", [whereSqlVal], false,1,10)`
+
+`query_uni_page({"tb1":"a", "tb2" : "b", "tb3" : "c"},[['tb1_key1', 'tb1_key2'], 'tb2_key','tb3_key'], "whereSql", [whereSqlVal], false,1,10)`
+
+示例：
+
+```python
+result = mysql.query_uni_page(
+        uniTb={"hs_archives": "a", "hs_addonarticle": "b","hs_arctype": "c"},
+        uniKey=[['id','typeid'],'aid', 'id'],
+        whereSql='where a.id>?',
+        whereSqlVal=[12],
+        fieldsAlias=True,
+        currentPage=currentPage,
+        pageSize=pageSize,
+    )
+```
+
+#### 6.5.2 mongodb
+
+##### 实例化
+
+```python
+obj_mongodb = self.db(dbtype='mongodb', active_index=0)
+```
+
+##### 新增
+
+> 插入单条数据
+
+示例
+
+```python
+# 返回值：返回新增_id字符串形式
+result = obj_table.table('sites').add({'x': i})
+```
+
+> 插入多条数据
+
+示例
+
+```python
+# 返回值：默认 return_type='count'返回新增行数，可选值return_type='_id' 返回新增_id字符串值形式的列表
+result = obj_table.table('sites').add([{'x': i} for i in range(2)])
+```
+
+##### 删除
+
+> 删除集合内容
+
+示例
+
+```python
+# 返回删除的条数
+# 注：如果不写删除条件会删除全部集合内文档
+result = obj_mongodb.table('sites').delete(
+    where={ "name": {"$regex": "^F"} },
+)
+```
+
+> 删除集合(表)
+
+示例
+
+```python
+result = obj_mongodb.table('sites').drop()
+```
+
+> 删除数据库
+
+示例
+
+```python
+result = obj_mongodb.drop_database('my_test')
+```
+
+##### 修改
+
+> 修改表记录
+
+示例
+
+```python
+# 返回更改条数
+obj_mongodb = self.db(dbtype='mongodb', active_index=0)
+result = obj_mongodb.table('sites').update(
+    where={"name": {"$regex": "^G"}},
+    update_sql={"$set": {"url": '456'}}
+)
+```
+
+> 重命名表(集合)
+
+示例
+
+```python
+obj_mongodb.rename_table('sites')
+```
+
+##### 查询
+
+> ##### 获取全部数据库名
+
+示例
+
+```python
+database_list = obj_mongodb.get_database_list()
+```
+
+> 获取全部表(集合)名
+
+示例
+
+```python
+collection_list = obj_mongodb.database('fenlei_zimeiti').get_collection_list()
+```
+
+> 普通查询(where查询条件支持所有mongodb语法)
+
+示例
+
+```python
+result = obj_mongodb.table('meiti').query(
+                    where={'id': {'$gt': '9980'}},
+                    fieldFilter= {'_id': 0},
+                    sort=[('id', 1)]
+            )
+```
+
+> 动态改变数据库查询
+
+示例
+
+```python
+result2 = obj_mongodb.database('fenlei_zimeiti').table('media_area').query()
+# 返回值：
+# 非空结果：[{...},[...]]
+# 空结果：[]
+```
+
+> 查询某个字段全部值(where查询条件支持所有mongodb语法)
+
+示例
+
+```python
+result = obj_mongodb.database('fenlei_zimeiti').table('meiti').query_distinct(
+                    where={'id': {'$gt': '9980'}},
+                    distinct='id'
+            )
+```
+
+> 聚合查询
+
+`管道操作符`
+
+```ini
+$group	将collection中的document分组，可用于统计结果
+$match	查询条件，只输出符合结果的文档
+$count	返回聚合管道此阶段的文档数计数
+$project	字段投影，修改输入文档的结构(例如重命名，增加、删除字段，创建结算结果等)
+$sort	将结果进行排序后输出
+$limit	限制管道输出的结果个数
+$skip	跳过制定数量的结果，并且返回剩下的结果
+$unwind	将数组类型的字段进行拆分
+$lookup	联表查询
+$geoNear	输出接近某一地理位置的有序文档。
+facet/bucket	分类搜索（MongoDB 3.4以上支持）
+```
+
+`表达式操作符`
+
+```ini
+$sum	计算总和，{$sum: 1}表示返回总和×1的值(即总和的数量),使用{$sum: '$制定字段'}也能直接获取制定字段的值的总和
+$avg	平均值
+$min	min
+$max	max
+$push	将结果文档中插入值到一个数组中
+$first	根据文档的排序获取第一个文档数据
+$last	同理，获取最后一个数据
+```
+
+示例
+
+```python
+from model import mongodb
+result = mongodb.database('fenlei_zimeiti').table('meiti').query_aggregate([
+                {'$match': {'id': {'$gte': 20}}},
+                {"$count": "totalNum"}
+            ])
+# 结果： [{'totalNum': 525}]
+
+# 返回值：数据不为空返回字典列表，数据为空返回空列表[]
+```
+
+> 分页查询(where查询条件支持所有mongodb语法)
+
+示例
+
+```python
+result = obj_mongodb.table('meiti').query_page(
+        where={'id': {'$gt': '9980'}},
+        currentPage=currentPage,
+        pageSize=pageSize,
+        sort=[('id', 1)]
+)
+# 返回值：
+# 非空数据时：{'items': [{...},{...}], 'pages': {'totalCount': 100, 'pageCount': 10, 'pageSize': 100, 'currentPage': 1}}
+# 空数据时：{'items': [], 'pages': {'totalCount': 0, 'pageCount': 0, 'pageSize': 100, 'currentPage': 1}}
+```
+
+##### 复制
+
+> 把 company 集合的数据完全复制到 new_company
+
+示例
+
+```python
+result = obj_mongodb.database('fenlei_zimeiti').table('company').table_copy_to('new_company')
+```
 
 
+
+#### 6.5.3 sqlite
+
+##### 实例化
+
+```python
+sqlite_obj = self.db(dbtype='sqlite', active_index=0)
+```
+
+##### 新增
+
+> 支持批量
+
+示例
+
+```python
+# 返回值：新增行数
+    result = sqlite_obj.table("student").add(
+        field=['name', 'age'],
+        fieldVal=[
+            ('july', '14'),
+            ('june', '25'),
+            ('marin', '36')
+        ]
+    )
+```
+
+##### 删除
+
+> 支持批量
+
+示例
+
+```python
+# 返回值：删除行数
+result = sqlite_obj.table("student").delete(
+   whereSql='where id = %s',
+   whereSqlVal=[(25), (26), (27)]
+)
+```
+
+##### 修改
+
+> 支持批量不同修改
+
+示例1：批量相同修改 
+
+```python
+# 
+result = sqlite_obj.table("student").edit(
+        sql='set gender=? where name=?',
+        sqlVal=[('女','Tom')]
+    )
+```
+
+示例2：批量不同修改
+
+```python
+# 返回值：修改受影响行数
+result = sqlite_obj.table("student").edit(
+    sql='set age=? where name=?',
+    sqlVal=[
+        ('10', 'july'),
+        ('11', 'june'),
+        ('12', 'marin'),
+    ]
+)
+```
+
+##### 查询
+
+> 普通查询
+
+```python
+result = sqlite_obj.table('student').query(
+            whereSql='where id>?',
+            whereSqlVal=[12]
+        )
+```
+
+> 分页查询
+
+示例
+
+```python
+result = sqlite_obj.table('student').query_page(
+    whereSql='where id>?',
+    whereSqlVal=[12],
+    currentPage=1,
+    pageSize=5
+)
+```
+
+> 查询某列不同值
+
+示例
+
+```python
+result = sqlite_obj.table('student')query_dif(
+    whereSql='where id>?',
+    whereSqlVal=[12],
+    field='id'
+)
+```
+
+> 多表查询
+
+`格式`
+
+`query_uni({"tb1":"a", "tb2" : "b"}, ['tb1_key', 'tb2_key'], "whereSql", [whereSqlVal], false)`
+
+`query_uni({"tb1":"a", "tb2" : "b", "tb3" : "c"},[['tb1_key1', 'tb1_key2'], 'tb2_key','tb3_key'], "whereSql", [whereSqlVal], false)`
+
+示例
+
+```python
+result = sqlite_obj.query_uni(
+    uniTb={"hs_archives": "a", "hs_addonarticle": "b","hs_arctype": "c"},
+    uniKey=[['id','typeid'],'aid', 'id'],
+    whereSql='where a.id>?',
+    whereSqlVal=[12],
+    fieldsAlias=True
+)
+```
+
+> 多表分页查询
+
+`格式`
+
+`query_uni_page({"tb1":"a", "tb2" : "b"}, ['tb1_key', 'tb2_key'], "whereSql", [whereSqlVal], false,1,10)`
+
+`query_uni_page({"tb1":"a", "tb2" : "b", "tb3" : "c"},[['tb1_key1', 'tb1_key2'], 'tb2_key','tb3_key'], "whereSql", [whereSqlVal], false,1,10)`
+
+示例
+
+```python
+result = mysql.query_uni_page(
+    uniTb={"hs_archives": "a", "hs_addonarticle": "b","hs_arctype": "c"},
+    uniKey=[['id','typeid'],'aid', 'id'],
+    whereSql='where a.id>?',
+    whereSqlVal=[12],
+    fieldsAlias=True,
+    currentPage=1,
+    pageSize=5,
+)
+```
+
+#### 6.5.4 redis
+
+##### 实例化
+
+```python
+redis_obj = self.db(dbtype='redis', active_index=0)
+```
+
+##### 新增
+> 添加字符串
+
+示例
+
+```python
+"""
+功能：添加
+描述：添加字符串
+参数：
+    key str 设置的键名
+    val any(支持python任意基础数据类型) 设置的键值
+返回值： 设置成功返回true
+注：
+    1.设置键名如果已存在会报错
+"""
+redis_obj.set(self, key, val)
+```
+> 添加集合
+
+示例
+
+```python
+"""
+功能：添加
+描述：添加集合
+参数：
+    name str 键名
+    *values 待新增的单个或多个集合元素
+返回值： 插入的集合元素个数
+注：
+    1.若插入已有的元素，则自动不插入
+"""
+redis_obj.sadd(name, *values)
+```
+
+##### 删除
+
+> 键名操作, 删除redis中一个或多个键的所有数据
+
+示例
+
+```python
+"""
+功能：删除
+描述：键名操作, 删除redis中一个或多个键的所有数据
+参数：
+    *names 待删除的单个或多个键名参数
+注：
+    1.返回值：int 删除的个数
+ """
+redis_obj.delete(*names)
+```
+
+> 删除集合中的一个或多个元素
+
+示例
+
+```python
+ """
+功能：删除
+描述：删除集合中的一个或多个元素
+参数：
+   name str 键名
+   *values 待删除的单个或多个集合元素
+返回值： 返回删除的元素个数 int
+"""
+redis_obj.srem(name, *values)
+```
+
+
+
+##### 查询
+
+> 获取字符串
+
+示例
+
+```python
+"""
+功能：查询
+描述：获取字符串
+参数：
+    key str 获取的键名
+返回值： 不存在返回None
+"""
+redis_obj.get(key)
+```
+
+> 判断某个值是否在集合中
+
+示例
+
+```python
+"""
+功能：查询
+描述：判断某个值是否在集合中
+参数：
+    name str 键名
+    value 集合元素
+返回值： 值存在返回True 值不存在或集合键名name本身不存在返回 False
+"""
+redis_obj.sismember(name, value)
+```
+
+##### 更多
+
+> 待完善
+
+### 6.6、模拟客户端发送请求
+
+> 支持文件上传(文件上传需传入二进制表示的文件路径)
+
+
+示例
+
+```python
+# 请求url
+url = 'http://127.0.0.1:5111/index'
+# 请求头
+header = {
+    'phone': '13688888888',
+    'key': '4afadf937d033a286d2127e64f44db63',
+}
+# url参数
+params = {
+    'type': 'newsmedia'
+}
+# 请求体
+data = {
+    'name': 'zhangsan',
+    'age': 18,
+    'pic': b'E:\\project\\python\\test\\tum6.png',   # 注：文件上传需传入二进制表示的路径
+}
+result = self.client(url=url, params=params, data=data, header=header, timeout=None)
+
+# 输出响应信息
+print(result.text) # 返回响应内容
+print(result.response_header) # 以列表元祖对的形式返回响应头信息
+print(result.version) # 返回版本信息
+print(result.status) # 返回状态码200 成功，404 代表网页未找到
+print(result.closed) # 返回对象是否关闭布尔值 False
+print(result.url) # 返回检索的URL http://127.0.0.1:5111/index?type=newsmedia
+print(result.code) # 返回响应的HTTP状态码 200
+print(result.msg) # 访问成功则返回 ok
+```

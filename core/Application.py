@@ -2,6 +2,7 @@ import json
 import os
 import re
 import traceback
+from pathlib import Path
 from typing import List
 from importlib import import_module
 
@@ -9,45 +10,101 @@ from core.common.JsonEncode import JsonEncode
 from core.extend.c8pyServer.HttpServer import httpServer
 from core.extend.log.Log import log
 from core.route.DefaultRoute import defaultRoute
-from config.CORS import CORS
+from config.CorsConfig import CorsConfig
+
 
 # 应用入口
 class Application:
-    """
-    # 所有装饰器路由列表，
-    [
-        {
-            'route': '/', 
-            'route_method': ['get', 'post'], 
-            'route_path_func': <function now at 0x0000000002BF2430>, 
-            'route_path_func_name': 'now', 
-            'route_path_func_args': ('self','name', 'age'), 
-            'route_path_func_module_path': 'app.home.controller.Index', 
-            'route_path_func_type_limit': {'name': <class 'str'>, 'age': <class 'int'>, 'return': <class 'str'>}
-        }
-    ]
-    """
+    # 实例
+    _instance = None
+
+    # 单例模式
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = object.__new__(cls)
+        return cls._instance
 
     # 构造函数
     def __init__(self):
         # 存放带装饰器的路由
+        """
+            # 所有装饰器路由列表，
+            [
+                {
+                    'route': '/',
+                    'route_method': ['get', 'post'],
+                    'route_path_func': <function now at 0x0000000002BF2430>,
+                    'route_path_func_name': 'now',
+                    'route_path_func_args': ('self','name', 'age'),
+                    'route_path_func_module_path': 'app.home.controller.Index',
+                    'route_path_func_type_limit': {'name': <class 'str'>, 'age': <class 'int'>, 'return': <class 'str'>}
+                }
+            ]
+            """
         self.routes: List[dict] = []
         # 路由中间件
         self.middleware = None
 
+    """
+    加载所有控制器
+    """
+
+    def __load_controller(self):
+        # 导入全部控制器文件(获取全部注解路由)
+        webRootDir = Path(__file__).parent.parent  # 获取站点根目录：D:\project\python\homepy
+        for module_path in Path(webRootDir / 'app').iterdir():  # 单层遍历目录
+            if module_path.parts[-1] != 'common':  # 排除 common 目录
+                # 递归遍历 controller 目录
+                controller_path = module_path / 'controller'
+                for root, dirs, files in os.walk(controller_path):  # 深层遍历目录
+                    # print(root, dirs, files)
+                    # D:\project\python\homepy\app\home\controller ['my', '__pycache__'] ['Index.py']
+                    # D:\project\python\homepy\app\home\controller\my ['__pycache__'] ['MyIndex.py']
+                    for controller_name in files:
+                        if controller_name[-3:] == '.py' and controller_name != '__init__.py':
+                            controller_namespace_prefix = root[len(str(webRootDir)) + 1:].replace(os.path.sep, '.')
+                            import_module(f'{controller_namespace_prefix}.{controller_name[:-3]}')
+
     # 中间件处理响应
     def call_next(self, request, response):
-        return self.__get_response_data(request, response)
+        return self.__exec_controller(request, response)
 
-    # 获取响应信息
-    def __get_response_data(self, request, response):
+    # 控制器路径函数执行前
+    def __controller_fun_exec_before(self, request, response, controller_obj):
+        # 收集请求cookie
+        if HTTP_COOKIE := request.get('HTTP_COOKIE'):
+            controller_obj._gather_request_cookies(HTTP_COOKIE)
+
+        # 动态属性赋值(将当前请求环境变量赋值给当前控制器实例化对象)
+        controller_obj.env = request
+
+    # 控制器路径函数执行后
+    def __controller_fun_exec_after(self, request, response, controller_obj, controller_path_func_return):
+        # 响应状态和响应头
+        response('200 OK', [*controller_obj.header_response, *controller_obj._assemble_response_cookies()])
+        if controller_path_func_return is not None:  # 如果存在返回值
+            if isinstance(controller_path_func_return, set):  # 如果是集合先转为列表list再转为js类型数据
+                controller_path_func_return = json.dumps(list(controller_path_func_return), cls=JsonEncode)
+            elif isinstance(controller_path_func_return, (dict, list, tuple, int, float, bool)):
+                controller_path_func_return = json.dumps(controller_path_func_return, cls=JsonEncode)
+            elif isinstance(controller_path_func_return, object):
+                controller_path_func_return = str(controller_path_func_return)
+            return controller_path_func_return
+        else:  # 如果不存在返回值或返回值为None，返回空字符串''
+            return ''
+
+    # 执行控制器方法
+    def __exec_controller(self, request, response):
+        # 加载控制器
+        self.__load_controller()
+
         # 首先处理带装饰器的路由
-        for route_info in self.routes:
+        for route_info in self.routes:  # 遍历装饰器上的所有路由，与当前请求路由匹配
             # 判断当前请求url是否满足装饰器路由
             # 带参装饰器路由 /my-dzy-18      /my-{name}-{age}
             # request['PATH_INFO'] = /my-dzy-18
             # route_info['route'] = /my-{name}-{age}
-            reg_str = '^' + re.sub(r'{\w+}', '(\\\w+)', route_info['route']) + '$'
+            reg_str = '^' + re.sub(r'{\w+}', r'(\\w+)', route_info['route']) + '$'
             if matchObj := re.search(reg_str, request['PATH_INFO']):
                 # 带参装饰器路由处理
                 route_path_func_decorator_params_val = []
@@ -58,62 +115,38 @@ class Application:
                 # 获取控制器类文件的模块路径
                 route_path_func_module_path = route_info['route_path_func_module_path']
                 # 控制器实例化
-                route_class_obj = getattr(import_module(route_path_func_module_path),
-                                          route_path_func_module_path.rpartition(".")[2])()
+                controller_obj = getattr(import_module(route_path_func_module_path),
+                                         route_path_func_module_path.rpartition(".")[2])()
 
-                # 收集请求cookie
-                if request.get('HTTP_COOKIE'):
-                    route_class_obj._gather_request_cookies(request['HTTP_COOKIE'])
+                # 控制器路径函数执行前
+                self.__controller_fun_exec_before(request, response, controller_obj)
 
-                # 动态属性赋值(将当前请求环境变量赋值给当前控制器实例化对象)
-                route_class_obj.env = request
+                # 执行控制器路径函数，并传递所需参数
+                controller_path_func_return = route_info['route_path_func'](controller_obj,
+                                                                            *route_path_func_decorator_params_val[
+                                                                             0:len(route_info[
+                                                                                       'route_path_func_args']) - 1])
 
-                # 执行路径函数，并传递所需参数
-                route_path_func_return = route_info['route_path_func'](route_class_obj,
-                                                                       *route_path_func_decorator_params_val[
-                                                                        0:len(route_info['route_path_func_args']) - 1])
-                # 响应状态和响应头
-                response('200 OK', [*route_class_obj.header_response, *route_class_obj._assemble_response_cookies()])
-                if route_path_func_return is not None:  # 如果存在返回值
-                    if isinstance(route_path_func_return, set):  # 如果是集合先转为列表list再转为js类型数据
-                        route_path_func_return = json.dumps(list(route_path_func_return), cls=JsonEncode)
-                    elif isinstance(route_path_func_return, (dict, list, tuple, int, float, bool)):
-                        route_path_func_return = json.dumps(route_path_func_return, cls=JsonEncode)
-                    elif isinstance(route_path_func_return, object):
-                        route_path_func_return = str(route_path_func_return)
-                    return route_path_func_return
-                else:  # 如果不存在返回值或返回值为None，返回空字符串''
-                    return ''
-                # return  # 直接返回不在执行后续else
-        else:  # 如果没有匹配到带装饰器的路由,执行默认路由
-            defaultRoute_return = defaultRoute.is_exists_default_request(request['PATH_INFO'])
+                # 返回控制器路径函数执行后结果
+                return self.__controller_fun_exec_after(request, response, controller_obj, controller_path_func_return)
 
-            if isinstance(defaultRoute_return, tuple) and defaultRoute_return[1]:  # 处理没有装饰器的路由
+        else:  # 继续执行默认路由
+            default_route_return = defaultRoute.is_exists_default_request(request['PATH_INFO'])
+
+            if isinstance(default_route_return, tuple) and default_route_return[1]:  # 处理默认路由(没有装饰器)的路由
                 # <app.home.controller.Index.Index object at 0x0000000002E620A0>
-                controller_obj = defaultRoute_return[0]()
+                controller_obj = default_route_return[0]()
 
-                # 收集请求cookie
-                if request.get('HTTP_COOKIE'):
-                    controller_obj._gather_request_cookies(request['HTTP_COOKIE'])
+                # 控制器路径函数执行前
+                self.__controller_fun_exec_before(request, response, controller_obj)
 
-                # 动态属性赋值(将当前请求环境变量赋值给当前控制器实例化对象)
-                controller_obj.env = request
+                # 调用控制器路径方法
+                controller_path_func_return = default_route_return[1](controller_obj)
 
-                # 调用控制器方法
-                route_path_func_return = defaultRoute_return[1](controller_obj)
-                # 处理响应数据
-                response('200 OK', [*controller_obj.header_response, *controller_obj._assemble_response_cookies()])
-                if route_path_func_return is not None:  # 如果存在返回值
-                    if isinstance(route_path_func_return, set):  # 如果是集合先转为列表list再转为js类型数据
-                        route_path_func_return = json.dumps(list(route_path_func_return), cls=JsonEncode)
-                    elif isinstance(route_path_func_return, (dict, list, tuple, int, float, bool)):
-                        route_path_func_return = json.dumps(route_path_func_return, cls=JsonEncode)
-                    elif isinstance(route_path_func_return, object):
-                        route_path_func_return = str(route_path_func_return)
-                    return route_path_func_return
-                else:  # 如果不存在返回值或返回值为None，返回空字符串''
-                    return ''
-            else:  # 404处理
+                # 返回控制器路径函数执行后结果
+                return self.__controller_fun_exec_after(request, response, controller_obj, controller_path_func_return)
+
+            else:  # 如果默认路由不存在，则404处理
                 response('404 No Found', [('Content-Type', 'text/html')])
                 return '找不到资源'
 
@@ -133,23 +166,25 @@ class Application:
         SERVER_NAME	这是你的 WEB 服务器的主机名、别名或IP地址。
         SERVER_SOFTWARE	这个环境变量的值包含了调用CGI程序的HTTP服务器的名称和版本号。例如，上面的值为Apache/2.2.14(Unix)
     """
+
     def __call__(self, env, response):
         # options请求（跨域预检）
         if env.get('REQUEST_METHOD') == 'OPTIONS':
             # 响应头(状态码，状态信息，响应头)
             response('200 OK', [
-                ('Access-Control-Allow-Origin', CORS.origin),
-                ('Access-Control-Allow-Headers', CORS.headers),
-                ('Access-Control-Allow-Methods', CORS.methods)])
+                ('Access-Control-Allow-Origin', CorsConfig.allow_host),
+                ('Access-Control-Allow-Headers', '*'),
+                ('Access-Control-Allow-Methods', '*')
+            ])
             # 响应体
-            return [''.encode('utf-8')]
+            return [b'']
 
         # 捕获应用程序执行错误
         try:
             if self.middleware:  # 中间件
                 return_response = self.middleware(env, response, self.call_next)
             else:  # 执行控制器函数
-                return_response = self.__get_response_data(env, response)
+                return_response = self.__exec_controller(env, response)
         except:  # 异常时执行的分支
             log.print(traceback.format_exc())
         else:  # 没有引发错误执行
@@ -166,25 +201,9 @@ class Application:
         # except KeyboardInterrupt:
         #     print('homepy已停止运行···')
 
+
 """
 1. 单例实例化
 2. wsgi协议规定：入口文件必须存在命名为application的可被调用对象
 """
 application = Application()
-
-# 导入全部控制器文件(获取全部注解路由)
-module_lists = os.listdir(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'app'))  # 扫描app目录
-# 遍历全部控制器模块
-for module_name in module_lists:
-    if module_name != 'common':  # 排除 common 目录
-        # 递归遍历 controller 目录
-        controller_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'app', module_name, 'controller')
-        for root, dirs, files in os.walk(controller_path):
-            # print(root, dirs, files)
-            # D:\project\python\pydyProject\app\home\controller ['my', '__pycache__'] ['Index.py']
-            # D:\project\python\pydyProject\app\home\controller\my ['__pycache__'] ['MyIndex.py']
-            for controller_name in files:
-                if controller_name[-3:] == '.py' and controller_name != '__init__.py':
-                    controller_prefix = root.replace(os.path.sep, '.').split(f'app.{module_name}.controller')[
-                        1]  # 拆分字符串为列表
-                    import_module(f'app.{module_name}.controller{controller_prefix}.{controller_name[:-3]}')

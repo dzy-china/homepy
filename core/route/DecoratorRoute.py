@@ -1,4 +1,4 @@
-from core.Application import application
+from core.Application import application as app
 
 
 # 装饰器路由系统
@@ -14,7 +14,7 @@ class DecoratorRoute:
             # /test ['get', 'post'] <function Index.test at 0x0000000002BCA280>
 
             # 追加路由前判断是否存在相同的url路由
-            for route_info in application.routes:
+            for route_info in app.routes:
                 if route == route_info['route']:
                     exception_msg = f'路径方法 <<{path_func.__module__}.{path_func.__name__}>>'
                     exception_msg += f' 与 <<{route_info["route_path_func_module_path"]}.{route_info["route_path_func"].__name__}>>'
@@ -22,7 +22,7 @@ class DecoratorRoute:
                     raise Exception(exception_msg)
 
             # 装载路由
-            application.routes.append({
+            app.routes.append({
                 'route': route,  # 路由url
                 'route_method': method, # 路由请求方法
                 'route_path_func': path_func, # 路由路径函数

@@ -49,9 +49,9 @@ class Mysql:
 
     """
     功能：新增，支持批量
-   返回值：新增首条id值(新增多条时，返回首条插入时的新增id)
    示例：
-    result = mysql.table("student").add(
+   # 返回值：新增首条id值(新增多条时，返回首条插入时的新增id)
+    result = obj_mysql.table("student").add(
         field=['name', 'age'],
         fieldVal=[
             ('july', '14'),

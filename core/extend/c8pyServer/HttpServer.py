@@ -1,6 +1,5 @@
 import datetime
 import gzip
-import os
 import re
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import cpu_count
@@ -9,15 +8,24 @@ import tempfile
 from io import BytesIO, BufferedReader
 import geoip2.database
 from pathlib import Path
-from .HttpServerResposeBody import HttpServerResposeBody
+from .ReqResHead import ReqResHead
 
 class HttpServer:
+    # 实例
+    _instance = None
+
     # 读取请求体时缓冲区大小
     socket_makefile_buf = 512
     # http请求方式
     request_method_list = ['POST', 'GET', 'HEAD', 'PUT', 'PATCH', 'OPTIONS', 'DELETE', 'CONNECT', 'TRACE']
     # GeoLite2数据库文件路径：D:\project\python\homepy\core\extend\c8pyServer\GeoLite2-City.mmdb
     GeoLite2_path = Path(__file__).parent / 'GeoLite2-City.mmdb'  # /为路径拼接符
+
+    # 单例模式
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = object.__new__(cls)
+        return cls._instance
 
     # 构造函数
     def __init__(self):
@@ -130,11 +138,11 @@ class HttpServer:
         request_head_dict = self.__head_parse(request_head_list)
 
         # 3. 响应类对象
-        resposeBody = HttpServerResposeBody()  # 实例化响应体
+        reqResHead = ReqResHead()  # 实例化响应体
         # 封装 wsgi environ
-        resposeBody.env_assemble(request_head_dict, geoip2_Obj, request_ip, self.port, self.hostname)
+        reqResHead.request_head_assemble(request_head_dict, geoip2_Obj, request_ip, self.port, self.hostname)
 
-        # 4. 继续读取请求体，重置 resposeBody.env['wsgi.input']
+        # 4. 继续读取请求体，重置 reqResHead.env['wsgi.input']
         if (content_length := int(request_head_dict.get('content-length', '0'))) > 0:
             # 'multipart/form-data'请求类型
             if 'multipart/form-data' in request_head_dict.get('content-type'):
@@ -153,18 +161,18 @@ class HttpServer:
                 temporary_file.seek(0)
 
                 # 赋值给 wsgi.input
-                resposeBody.env['wsgi.input'] = BufferedReader(temporary_file)
+                reqResHead.env['wsgi.input'] = BufferedReader(temporary_file)
             else:  # 其它请求类型
                 request_body = fp.read(content_length)
-                resposeBody.env['wsgi.input'] = BytesIO(request_body)
+                reqResHead.env['wsgi.input'] = BytesIO(request_body)
 
         # 5.调用处理响应的回调函数
-        response_body = self.callback(resposeBody.env, resposeBody.response_head_assemble)
+        response_body = self.callback(reqResHead.env, reqResHead.response_head_assemble)
 
         # 6.发送响应内容(响应头和响应体)
-        if 'gzip' in resposeBody.env.get('HTTP_ACCEPT_ENCODING'):
+        if 'gzip' in reqResHead.env.get('HTTP_ACCEPT_ENCODING'):
             response_body[0] = gzip.compress(response_body[0])
-        client_socket.sendall(resposeBody.response_head + response_body[0])
+        client_socket.sendall(reqResHead.response_head + response_body[0])
 
         # 7. 关流
         self.__close(client_socket, fp, temporary_file)
